@@ -8,9 +8,16 @@ let server: Handler;
 async function bootstrap(): Promise<Handler> {
   const app = await NestFactory.create(AppModule);
   
-  // Wajib agar Vercel frontend bisa menarik data dari backend ini
-  app.enableCors(); 
-  
+  // 1. Tambahkan Global Prefix agar URL /api/v1/... bisa terbaca
+  app.setGlobalPrefix('api/v1');
+
+  // 2. Konfigurasi CORS yang lebih kuat agar frontend Vercel diizinkan masuk
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
+
   await app.init();
   const expressApp = app.getHttpAdapter().getInstance();
   return serverlessExpress({ app: expressApp });
