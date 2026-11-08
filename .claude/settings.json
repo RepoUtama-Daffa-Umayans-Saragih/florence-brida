@@ -1,0 +1,27 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://router.classai.id",
+    "ANTHROPIC_AUTH_TOKEN": "sk_live_COE38xfJAuLx0eJsRZZJKgLiS28Ig8uBXxFkyMAK",
+    "ANTHROPIC_MODEL": "claude-sonnet-5.5",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-sonnet-5.5"
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Write",
+      "Edit",
+      "Bash(npm:*)",
+      "Bash(git:*)",
+      "Bash(mkdir:*)",
+      "Bash(dir:*)",
+      "Bash(type:*)"
+    ],
+    "deny": [
+      "Bash(rm:*)",
+      "Bash(del:*)",
+      "Bash(format:*)"
+    ]
+  }
+}

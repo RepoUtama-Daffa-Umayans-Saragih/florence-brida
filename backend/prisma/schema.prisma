@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Titik pantau fisik/simulasi yang menggabungkan CCTV dan sensor lingkungan.
+model Node {
+  id             String       @id @default(cuid())
+  code           String       @unique // Contoh: T-08
+  name           String?
+  nodeType       NodeType     @default(SIMULATED)
+  status         NodeStatus   @default(ONLINE)
+  adm4           String?      @db.VarChar(20)
+  latitude       Decimal      @db.Decimal(10, 7)
+  longitude      Decimal      @db.Decimal(10, 7)
+  geom           Unsupported("geometry(Point, 4326)")?
+  dMaxCm         Decimal?     @db.Decimal(8, 2)
+  tNormMinutes   Int?
+  cctvUrl        String?
+  lastSeenAt     DateTime?
+  batteryPercent Decimal?     @db.Decimal(5, 2)
+  signalStrength Decimal?     @db.Decimal(6, 2)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  readings       Reading[]
+  forecasts      FloodForecast[]
+  reports        CitizenReport[]
+  segments       NodeSegment[]
+
+  @@index([adm4])
+  @@index([status])
+  @@map("nodes")
+}
+
+/// Pembacaan sensor dan keluaran numerik inferensi CCTV setiap siklus sekitar 5 menit.
+model Reading {
+  id                BigInt    @id @default(autoincrement())
+  nodeId            String
+  measuredAt        DateTime
+  waterCm           Decimal?  @db.Decimal(8, 2)
+  drainCm           Decimal?  @db.Decimal(8, 2)
+  rainMmH           Decimal?  @db.Decimal(8, 3)
+  windMs            Decimal?  @db.Decimal(8, 3)
+  temperatureC      Decimal?  @db.Decimal(6, 2)
+  humidityPercent   Decimal?  @db.Decimal(5, 2)
+  pressureHpa       Decimal?  @db.Decimal(8, 2)
+  waterRiseCmMin    Decimal?  @db.Decimal(8, 3)
+  floodedAreaM2     Decimal?  @db.Decimal(10, 2)
+  cctvWaterCm       Decimal?  @db.Decimal(8, 2)
+  ultrasonicWaterCm Decimal?  @db.Decimal(8, 2)
+  cctvConfidence    Decimal?  @db.Decimal(5, 4)
+  rainDetected      Boolean?
+  zone              Zone?
+  quality           ReadingQuality @default(VALID)
+  createdAt         DateTime  @default(now())
+
+  node              Node      @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@unique([nodeId, measuredAt])
+  @@index([nodeId, measuredAt(sort: Desc)])
+  @@index([measuredAt])
+  @@map("readings")
+}
+
+/// Prediksi tinggi muka air 15/30 menit dan status siaga.
+model FloodForecast {
+  id              BigInt    @id @default(autoincrement())
+  nodeId          String
+  generatedAt     DateTime
+  horizonMinutes  Int
+  predictedWaterCm Decimal   @db.Decimal(8, 2)
+  thresholdCm     Decimal?  @db.Decimal(8, 2)
+  bmkgRiskOrdinal Int?
+  warningActive   Boolean   @default(false)
+  alert           Boolean   @default(false)
+  modelVersion    String?
+
+  node            Node      @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@unique([nodeId, generatedAt, horizonMinutes])
+  @@index([nodeId, generatedAt(sort: Desc)])
+  @@map("flood_forecasts")
+}
+
+/// Safe point resmi yang kapasitas/statusnya dikelola internal, bukan dari Places API.
+model SafePoint {
+  id            String       @id @default(cuid())
+  name          String
+  description   String?
+  latitude      Decimal      @db.Decimal(10, 7)
+  longitude     Decimal      @db.Decimal(10, 7)
+  geom          Unsupported("geometry(Point, 4326)")?
+  capacity      Int
+  occupied      Int          @default(0)
+  isOpen        Boolean      @default(true)
+  contactPhone  String?
+  address       String?
+  verifiedAt    DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  reports       CitizenReport[]
+
+  @@index([isOpen])
+  @@map("safe_points")
+}
+
+/// Prakiraan BMKG per wilayah adm4; satu wilayah memiliki banyak slot waktu.
+model BmkgForecast {
+  id            BigInt    @id @default(autoincrement())
+  adm4          String    @db.VarChar(20)
+  validTime     DateTime
+  localDatetime DateTime?
+  analysisDate  DateTime?
+  weatherCode   Int?
+  weatherDesc   String?
+  temperatureC  Decimal?  @db.Decimal(6, 2)
+  humidity      Decimal?  @db.Decimal(5, 2)
+  windMs        Decimal?  @db.Decimal(8, 3)
+  windDirection String?
+  cloudCover    Decimal?  @db.Decimal(5, 2)
+  visibilityKm  Decimal?  @db.Decimal(8, 2)
+  riskOrdinal   Int?
+  fetchedAt     DateTime  @default(now())
+  rawPayload    Json?
+
+  @@unique([adm4, validTime])
+  @@index([adm4, validTime])
+  @@index([fetchedAt])
+  @@map("bmkg_forecasts")
+}
+
+/// Wilayah kelurahan/desa BMKG (adm4) untuk pemetaan node dan cache prakiraan.
+model Adm4Region {
+  adm4       String      @id @db.VarChar(20)
+  name       String
+  geom       Unsupported("geometry(MultiPolygon, 4326)")?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@map("adm4_regions")
+}
+
+/// Ruas jalan yang menerima bobot routing FLORENCE dan zona banjir.
+model RoadSegment {
+  id          String       @id @default(cuid())
+  externalId  String?      @unique
+  name        String?
+  geom        Unsupported("geometry(LineString, 4326)")?
+  lengthM     Decimal?     @db.Decimal(10, 2)
+  speedKmh    Decimal?     @db.Decimal(6, 2)
+  zone        Zone         @default(GREEN)
+  floodPenalty Decimal?    @db.Decimal(12, 2)
+  isBlocked   Boolean      @default(false)
+  updatedAt   DateTime     @updatedAt
+
+  nodes       NodeSegment[]
+
+  @@index([zone])
+  @@index([isBlocked])
+  @@map("road_segments")
+}
+
+model NodeSegment {
+  nodeId       String
+  segmentId    String
+  distanceM    Decimal? @db.Decimal(10, 2)
+
+  node         Node        @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  segment      RoadSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@id([nodeId, segmentId])
+  @@map("node_segments")
+}
+
+/// Laporan warga; hanya laporan terverifikasi yang digunakan dalam DBI/V_rpt.
+model CitizenReport {
+  id              String       @id @default(cuid())
+  nodeId          String?
+  safePointId     String?
+  category        ReportCategory
+  description     String?
+  photoObjectKey  String?
+  latitude        Decimal      @db.Decimal(10, 7)
+  longitude       Decimal      @db.Decimal(10, 7)
+  geom            Unsupported("geometry(Point, 4326)")?
+  status          ReportStatus @default(NEW)
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  node            Node?        @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  safePoint       SafePoint?   @relation(fields: [safePointId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([nodeId])
+  @@map("citizen_reports")
+}
+
+/// Snapshot historis status zona jalan dan tinggi muka air untuk fitur Mesin Waktu FLORENCE.
+model ZoneHistorySnapshot {
+  id            String       @id @default(cuid())
+  snapshotDate  DateTime
+  roadName      String
+  latitude      Decimal      @db.Decimal(10, 7)
+  longitude     Decimal      @db.Decimal(10, 7)
+  zone          Zone         @default(GREEN)
+  waterLevel    String       // "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+  waterDepthCm  Decimal      @db.Decimal(8, 2)
+  severity      String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+
+  @@index([snapshotDate])
+  @@index([zone])
+  @@map("zone_history_snapshots")
+}
+
+/// Laporan banjir faktual / historis berbasis arsip lapangan dan media massa.
+model FloodReport {
+  id                String       @id @default(cuid())
+  title             String
+  locationName      String
+  latitude          Decimal      @db.Decimal(10, 7)
+  longitude         Decimal      @db.Decimal(10, 7)
+  reportDate        DateTime
+  status            Zone         @default(RED)
+  waterLevel        String       // "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+  waterDepthCm      Decimal?     @db.Decimal(8, 2)
+  impactDescription String?
+  sourceUrl         String?
+  verified          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+
+  @@index([reportDate])
+  @@index([status])
+  @@map("flood_reports")
+}
+
+enum NodeType {
+  PHYSICAL
+  SIMULATED
+}
+
+enum NodeStatus {
+  ONLINE
+  OFFLINE
+  STALE
+  MAINTENANCE
+}
+
+enum Zone {
+  GREEN
+  YELLOW
+  RED
+}
+
+enum ReadingQuality {
+  VALID
+  SUSPECT
+  INVALID
+}
+
+enum ReportCategory {
+  FLOODING
+  WASTE_BLOCKAGE
+  DAMAGED_DRAIN
+  OTHER
+}
+
+enum ReportStatus {
+  NEW
+  VERIFIED
+  IN_PROGRESS
+  RESOLVED
+  REJECTED
+}
