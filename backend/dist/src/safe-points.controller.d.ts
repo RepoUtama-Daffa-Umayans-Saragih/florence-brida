@@ -6,9 +6,9 @@ export declare class SafePointsController {
         ts: string;
         items: {
             id: string;
-            name: string;
             latitude: import("@prisma/client/runtime/library").Decimal;
             longitude: import("@prisma/client/runtime/library").Decimal;
+            name: string;
             capacity: number;
             occupied: number;
             isOpen: boolean;
