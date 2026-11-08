@@ -12,7 +12,7 @@ export default function EmergencyInfo() {
   useEffect(() => {
     let active = true;
     try { const cached = localStorage.getItem(KEY); if (cached) setData(JSON.parse(cached)); } catch { /* Storage can be disabled. */ }
-    const base = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/$/, '');
+    const base = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/$/, '').replace(/\/api\/v1$/, '');
     async function refresh() {
       setOffline(!navigator.onLine);
       if (!navigator.onLine) return;

@@ -21,7 +21,7 @@ export default function LiveFloodMap({ flyTo, originPoint, routePath = [], isNav
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const base = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/$/, '');
+    const base = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/$/, '').replace(/\/api\/v1$/, '');
 
     // 1. Fetch snapshot langsung saat mount agar data node & segment tidak kosong jika SSE tertunda
     fetch(`${base}/api/v1/zones/snapshot`, { signal: AbortSignal.timeout(6000) })

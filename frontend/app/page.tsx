@@ -162,7 +162,7 @@ export default function PublicPortalPage() {
     setRouteData(null);
 
     try {
-      const base = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/$/, '');
+      const base = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/$/, '').replace(/\/api\/v1$/, '');
 
       // 1. Ambil snapshot graph (nodes + segments dengan zone terkini dari backend)
       const snapshotRes = await fetch(`${base}/api/v1/zones/snapshot`, { signal: AbortSignal.timeout(8_000) });

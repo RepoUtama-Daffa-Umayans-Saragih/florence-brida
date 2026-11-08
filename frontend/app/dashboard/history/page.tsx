@@ -28,6 +28,7 @@ export default function HistoryPlaybackPage() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [selectedZone, setSelectedZone] = useState<FloodedRoadSegment | null>(null);
   const [activeCCTV, setActiveCCTV] = useState<string | null>(null);
+  const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
   const [mapCursor, setMapCursor] = useState<string>('default');
 
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -542,12 +543,13 @@ export default function HistoryPlaybackPage() {
       </div>
 
       {/* ── Top Header Bar (Government Command Center) ── */}
-      <header className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between gap-4 pointer-events-none">
+      <header className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-20 flex items-center justify-between gap-3 pointer-events-none">
         {/* Sisi Kiri: Tombol Back, Pusat Analitik & Branding Command Center */}
-        <div className="pointer-events-auto flex items-center gap-3">
+        <div className="pointer-events-auto flex items-center gap-2 sm:gap-2.5">
           <Link
             href="/"
-            className="flex items-center gap-2 rounded-2xl border border-white/60 bg-white/90 px-4 py-2.5 text-xs font-bold text-slate-800 shadow-xl backdrop-blur-xl transition hover:bg-white hover:text-blue-700 active:scale-95"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-700/80 bg-slate-900/90 px-3 py-2 text-xs font-bold text-slate-200 shadow-xl backdrop-blur-md transition hover:bg-slate-800 hover:text-white active:scale-95"
+            title="Kembali ke Portal Publik"
           >
             <span>←</span>
             <span className="hidden sm:inline">Portal Publik</span>
@@ -555,24 +557,25 @@ export default function HistoryPlaybackPage() {
 
           <Link
             href="/dashboard/analytics"
-            className="flex items-center gap-1.5 rounded-2xl border border-blue-200 bg-blue-600/90 px-3.5 py-2.5 text-xs font-bold text-white shadow-xl backdrop-blur-xl transition hover:bg-blue-600 active:scale-95"
+            className="flex items-center gap-1.5 rounded-xl border border-blue-500/40 bg-blue-600/30 px-3 py-2 text-xs font-bold text-blue-300 shadow-xl backdrop-blur-md transition hover:bg-blue-600/50 hover:text-white active:scale-95"
+            title="Buka Pusat Analitik Bencana"
           >
             <span>📊</span>
             <span className="hidden sm:inline">Pusat Analitik</span>
           </Link>
 
-          <div className="flex items-center gap-2.5 rounded-2xl border border-white/60 bg-white/90 px-4 py-2 text-xs shadow-xl backdrop-blur-xl text-slate-900">
+          <div className="flex items-center gap-2.5 rounded-xl border border-slate-700/80 bg-slate-900/90 px-3 py-1.5 text-xs shadow-xl backdrop-blur-md text-white">
             <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-600 text-xs font-black text-white shadow-xs">
               FL
             </span>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold tracking-wide text-slate-900">FLORENCE GOV</span>
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-black text-blue-700 border border-blue-200">
+                <span className="font-extrabold tracking-wide text-white">FLORENCE GOV</span>
+                <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[9px] font-black text-blue-300 border border-blue-500/30">
                   COMMAND CENTER
                 </span>
               </div>
-              <p className="text-[10px] text-slate-500">
+              <p className="text-[10px] text-slate-400 hidden md:block">
                 Mesin Waktu Banjir · Simulasi Spillover Kemacetan Domino
               </p>
             </div>
@@ -580,46 +583,57 @@ export default function HistoryPlaybackPage() {
         </div>
 
         {/* Sisi Kanan: Traffic Layer Status, Badge Peristiwa & Status Puncak */}
-        <div className="pointer-events-auto hidden md:flex items-center gap-2.5">
+        <div className="pointer-events-auto flex items-center gap-2">
+          {/* Mobile Toggle Button for StatsPanel */}
+          <button
+            type="button"
+            onClick={() => setIsMobilePanelOpen(!isMobilePanelOpen)}
+            className="sm:hidden flex items-center gap-1.5 rounded-xl border border-slate-700/80 bg-slate-900/90 px-3 py-2 text-xs font-bold text-white shadow-xl backdrop-blur-md active:scale-95 cursor-pointer"
+            title="Buka / Tutup Panel Ringkasan & CCTV"
+          >
+            <span>📊</span>
+            <span>{isMobilePanelOpen ? 'Peta' : 'Info'}</span>
+          </button>
+
           {/* Badge Peristiwa Aktif */}
-          <div className="flex items-center gap-2 rounded-2xl border border-white/60 bg-white/90 px-3.5 py-2 text-xs font-bold backdrop-blur-xl shadow-xl">
+          <div className="hidden md:flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-3.5 py-2 text-xs font-bold backdrop-blur-md shadow-xl text-white">
             {isSafeState ? (
-              <span className="text-emerald-700 flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span className="text-emerald-400 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 🟢 {selectedDate === 'Hari Ini' ? 'Hari Ini' : selectedDate}: Kondisi Normal
               </span>
             ) : isNov27 ? (
-              <span className="text-red-700 flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-red-600 animate-ping" />
-                🔴 27 Nov 2025: Banjir &amp; Spillover Kemacetan
+              <span className="text-red-400 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-red-600 animate-ping" />
+                🔴 27 Nov 2025: Banjir &amp; Kemacetan
               </span>
             ) : isOct11 ? (
-              <span className="text-amber-600 flex items-center gap-1.5">
+              <span className="text-amber-400 flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                🟡 11 Okt 2025: Luapan Sungai Babura &amp; Deli
+                🟡 11 Okt 2025: Luapan Babura
               </span>
             ) : (
-              <span className="text-blue-700">📅 Arsip: {selectedDate}</span>
+              <span className="text-blue-300">📅 Arsip: {selectedDate}</span>
             )}
           </div>
 
           {/* Status Traffic Injected Manual (streets-v12) */}
-          <div className="flex items-center gap-2 rounded-2xl border border-white/60 bg-white/90 px-3.5 py-2 text-xs font-semibold backdrop-blur-xl text-slate-800 shadow-xl">
+          <div className="hidden lg:flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-3 py-2 text-xs font-semibold backdrop-blur-md text-slate-200 shadow-xl">
             <span className="text-sm">🚦</span>
             <span>Live Traffic</span>
             <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
 
-          <div className="rounded-2xl border border-white/60 bg-white/90 px-4 py-2 text-xs font-mono font-bold text-slate-900 backdrop-blur-xl shadow-xl">
+          <div className="hidden sm:flex rounded-xl border border-slate-700/80 bg-slate-900/90 px-3.5 py-2 text-xs font-mono font-bold text-slate-200 backdrop-blur-md shadow-xl">
             STATUS:{' '}
             <span
-              className={
+              className={`ml-1 ${
                 isSafeState
-                  ? 'text-emerald-600 font-extrabold'
+                  ? 'text-emerald-400 font-extrabold'
                   : isNov27
-                  ? 'text-red-600 font-extrabold'
-                  : 'text-amber-600 font-extrabold'
-              }
+                  ? 'text-red-400 font-extrabold'
+                  : 'text-amber-400 font-extrabold'
+              }`}
             >
               {isSafeState ? 'KONDISI NORMAL' : isNov27 ? 'DARURAT BENCANA' : 'SIAGA WASPADA'}
             </span>
@@ -628,46 +642,43 @@ export default function HistoryPlaybackPage() {
       </header>
 
       {/* ── Floating Left: Daftar Ruas Jalan & Legenda 3-Tier Multi-Layer ── */}
-      <div className="pointer-events-auto hidden xl:block absolute left-6 top-28 z-20 w-72 rounded-2xl border border-white/60 bg-white/90 p-4 text-xs backdrop-blur-xl shadow-2xl text-slate-900">
-        <h3 className="font-bold text-slate-900 uppercase tracking-wider text-[11px] border-b border-slate-200/80 pb-2">
-          {isSafeState
-            ? 'STATUS MONITORING JALAN'
-            : isNov27
-            ? 'Ruas Jalan Tergenang (27 Nov)'
-            : 'Ruas Jalan Tergenang (11 Okt)'}
+      <div className="pointer-events-auto hidden xl:flex flex-col absolute left-6 top-20 z-20 w-72 max-h-[calc(100vh-14.5rem)] rounded-2xl border border-slate-800/90 bg-slate-900/90 p-4 text-xs backdrop-blur-md shadow-2xl text-white overflow-hidden">
+        <h3 className="font-bold text-white uppercase tracking-wider text-[11px] border-b border-slate-800/80 pb-2 shrink-0 flex items-center justify-between">
+          <span>{isSafeState ? 'STATUS MONITORING JALAN' : isNov27 ? 'Ruas Tergenang (27 Nov)' : 'Ruas Tergenang (11 Okt)'}</span>
+          <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
         </h3>
 
         {isSafeState ? (
-          <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl mt-4 flex flex-col items-center text-center">
-            <span className="text-emerald-600 font-bold text-lg mb-1">✅ Status Aman</span>
-            <span className="text-slate-600 text-sm">Tidak ada titik genangan air atau kemacetan yang terpantau pada tanggal ini.</span>
+          <div className="p-3.5 bg-emerald-950/40 border border-emerald-500/30 rounded-xl mt-3 flex flex-col items-center text-center">
+            <span className="text-emerald-400 font-bold text-sm mb-1">✅ Status Aman</span>
+            <span className="text-slate-300 text-[11px] leading-relaxed">Tidak ada titik genangan air atau kemacetan yang terpantau pada tanggal ini.</span>
           </div>
         ) : (
-          <>
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {/* Daftar Ruas Segmen Jalan */}
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 space-y-1.5 flex-1 min-h-0 overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-slate-700/60 [&::-webkit-scrollbar-thumb]:rounded-full">
               {activeSegments.slice(0, 5).map((seg, idx) => (
                 <button
                   key={seg.id}
                   type="button"
                   onClick={() => setSelectedZone(seg)}
-                  className={`w-full text-left p-2 rounded-xl transition flex items-center justify-between gap-2 ${
+                  className={`w-full text-left p-2 rounded-xl transition flex items-center justify-between gap-2 cursor-pointer ${
                     selectedZone?.id === seg.id
-                      ? 'bg-blue-100/90 border border-blue-400 ring-2 ring-blue-500/30 shadow-sm'
-                      : 'bg-slate-50 hover:bg-slate-100 border border-slate-200/80'
+                      ? 'bg-blue-600/30 border border-blue-400 text-white ring-1 ring-blue-500/50 shadow-sm'
+                      : 'bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800/80 text-slate-200'
                   }`}
                 >
                   <div className="min-w-0">
-                    <span className="block font-bold text-slate-800 text-[11px] truncate">
+                    <span className="block font-bold text-white text-[11px] truncate">
                       {idx + 1}. {seg.name.split('(')[0].trim()}
                     </span>
-                    <span className="block text-[10px] text-slate-500 truncate">
+                    <span className="block text-[10px] text-slate-400 truncate">
                       {seg.name.includes('(') ? seg.name.split('(')[1].replace(')', '') : ''}
                     </span>
                   </div>
                   <span className={`text-[10px] font-black px-1.5 py-0.5 rounded shrink-0 ${
                     seg.severityGrade === 'extreme'
-                      ? 'bg-black text-red-300'
+                      ? 'bg-black text-red-300 border border-red-800'
                       : seg.severityGrade === 'very-critical'
                       ? 'bg-red-900 text-white'
                       : seg.severityGrade === 'critical'
@@ -681,37 +692,39 @@ export default function HistoryPlaybackPage() {
             </div>
 
             {/* Legenda Hierarki 3 Tingkat Multi-Layer (Efek Domino Kemacetan) */}
-            <div className="mt-4 pt-3 border-t border-slate-200/80 text-[10px] space-y-2 text-slate-600">
-              <p className="font-bold uppercase tracking-wider text-[9px] text-slate-500">
+            <div className="mt-3 pt-2.5 border-t border-slate-800/80 text-[10px] space-y-1.5 text-slate-300 shrink-0">
+              <p className="font-bold uppercase tracking-wider text-[9px] text-slate-400">
                 Hierarki Dampak Sistemik:
               </p>
               <div className="flex items-center gap-2">
-                <span className="h-2 w-5 rounded-full bg-[#991b1b] shadow-xs" />
-                <span className="font-bold text-slate-900">Merah Tua: Pusat Banjir (8px)</span>
+                <span className="h-2 w-4 rounded-full bg-[#991b1b] shadow-xs" />
+                <span className="font-semibold text-slate-200">Merah Tua: Pusat Banjir (8px)</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-1.5 w-5 rounded-full bg-[#f97316]" />
-                <span className="font-semibold text-slate-800">Oranye: Antrean Terjebak 100-400m (5px)</span>
+                <span className="h-1.5 w-4 rounded-full bg-[#f97316]" />
+                <span className="text-slate-300">Oranye: Antrean 100-400m (5px)</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-1 w-5 rounded-full bg-[#eab308]" />
-                <span className="font-semibold text-slate-800">Kuning: Pengalihan Arus 400-800m (4px)</span>
+                <span className="h-1 w-4 rounded-full bg-[#eab308]" />
+                <span className="text-slate-300">Kuning: Pengalihan 400-800m (4px)</span>
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
 
       {/* ── Floating Right: Panel Statistik & Smart Inspector (DSS) ── */}
-      <StatsPanel
-        timeMinutes={timeMinutes}
-        selectedDate={selectedDate}
-        selectedZone={selectedZone}
-        onCloseZone={() => setSelectedZone(null)}
-        onSelectZone={(zone) => setSelectedZone(zone)}
-        isSafeState={isSafeState}
-        onSelectCCTV={(cctvName) => setActiveCCTV(cctvName)}
-      />
+      <div className={isMobilePanelOpen ? 'block' : 'hidden sm:block'}>
+        <StatsPanel
+          timeMinutes={timeMinutes}
+          selectedDate={selectedDate}
+          selectedZone={selectedZone}
+          onCloseZone={() => setSelectedZone(null)}
+          onSelectZone={(zone) => setSelectedZone(zone)}
+          isSafeState={isSafeState}
+          onSelectCCTV={(cctvName) => setActiveCCTV(cctvName)}
+        />
+      </div>
 
       {/* ── Floating Bottom: Timeline & Mesin Waktu Playback ── */}
       <TimelineSlider

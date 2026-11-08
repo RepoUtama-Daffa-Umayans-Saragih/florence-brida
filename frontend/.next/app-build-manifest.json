@@ -6,21 +6,15 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/dashboard/analytics/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/dashboard/analytics/page.css",
-      "static/chunks/app/dashboard/analytics/page.js"
+      "static/chunks/app/page.js"
     ],
     "/manifest.webmanifest/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/manifest.webmanifest/route.js"
-    ],
-    "/dashboard/history/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/history/page.js"
     ]
   }
 }
