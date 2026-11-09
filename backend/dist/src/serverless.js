@@ -7,7 +7,6 @@ let cachedServer;
 async function bootstrap() {
     if (!cachedServer) {
         const app = await core_1.NestFactory.create(app_module_1.AppModule);
-        app.setGlobalPrefix('api/v1');
         app.enableCors({
             origin: '*',
             methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',

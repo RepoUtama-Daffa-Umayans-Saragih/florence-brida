@@ -8,8 +8,7 @@ async function bootstrap() {
   if (!cachedServer) {
     const app = await NestFactory.create(AppModule);
     
-    // Prefix dan CORS yang sudah kita atur sebelumnya
-    app.setGlobalPrefix('api/v1');
+    // Controllers define their full /api/v1 paths; don't add a second global prefix.
     app.enableCors({
       origin: '*',
       methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
