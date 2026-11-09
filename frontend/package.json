@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbo",
+    "dev:webpack": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@turf/turf": "^7.4.0",
     "mapbox-gl": "^3.34.2",
     "next": "^15.5.0",
     "next-pwa": "^5.6.0",

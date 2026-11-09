@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import Map, { Marker, Popup, NavigationControl, Source, Layer } from 'react-map-gl/mapbox';
 import TimelineSlider from '../../../components/TimelineSlider';
 import StatsPanel from '../../../components/StatsPanel';
@@ -13,6 +14,23 @@ import {
   type FloodedRoadSegment,
   type CascadingRoute,
 } from './simulateCascadingTraffic';
+import type { SafeRouteResult, PointCoord } from '../../../lib/safeRoutingEngine';
+
+// Dynamic Import SSR = false untuk Komponen Navigasi Rute Spasial (mencegah error window is not defined & crash SSR)
+const FloodSafeRouteNavigation = dynamic(
+  () => import('../../../components/FloodSafeRouteNavigation'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-[340px] sm:w-[380px] rounded-3xl border border-slate-700/80 bg-slate-900/90 p-4 text-xs text-slate-300 shadow-2xl backdrop-blur-xl">
+        <div className="flex items-center gap-2">
+          <span className="h-4 w-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+          <span className="font-bold">Memuat Navigasi Rute Aman...</span>
+        </div>
+      </div>
+    ),
+  }
+);
 
 const SEGMENTS_NOV: FloodedRoadSegment[] = snappedData.nov2025 as FloodedRoadSegment[];
 const SEGMENTS_OCT: FloodedRoadSegment[] = snappedData.oct2025 as FloodedRoadSegment[];
@@ -30,6 +48,19 @@ export default function HistoryPlaybackPage() {
   const [activeCCTV, setActiveCCTV] = useState<string | null>(null);
   const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
   const [mapCursor, setMapCursor] = useState<string>('default');
+
+  // State Fitur Navigasi Rute Bebas Banjir (Spatial Constraints)
+  const [showNavPanel, setShowNavPanel] = useState(true);
+  const [safeRouteResult, setSafeRouteResult] = useState<SafeRouteResult | null>(null);
+  const [pickingLocationMode, setPickingLocationMode] = useState<'start' | 'dest' | null>(null);
+  const [externalStart, setExternalStart] = useState<PointCoord | null>(null);
+  const [externalDest, setExternalDest] = useState<PointCoord | null>(null);
+
+  // Mencegah error SSR (Server-Side Rendering) pada Mapbox GL & pustaka spasial browser
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -210,7 +241,23 @@ export default function HistoryPlaybackPage() {
   }, [activeSegments, activeCascading, factor]);
 
   // Handler interaktif: Klik ruas jalan banjir untuk membuka Smart Inspector Panel (DSS)
+  // Atau memilih titik koordinat asal/tujuan pada peta jika mode navigasi aktif
   function handleMapClick(event: any) {
+    if (pickingLocationMode && event.lngLat) {
+      const coord: PointCoord = {
+        name: `Titik Peta (${event.lngLat.lat.toFixed(4)}, ${event.lngLat.lng.toFixed(4)})`,
+        lat: Number(event.lngLat.lat.toFixed(5)),
+        lng: Number(event.lngLat.lng.toFixed(5)),
+      };
+      if (pickingLocationMode === 'start') {
+        setExternalStart(coord);
+      } else {
+        setExternalDest(coord);
+      }
+      setPickingLocationMode(null);
+      return;
+    }
+
     const feature = event.features && event.features[0];
     if (feature && feature.properties?.id) {
       const found = activeSegments.find((s) => s.id === feature.properties.id);
@@ -235,7 +282,14 @@ export default function HistoryPlaybackPage() {
     <main className="relative h-screen w-screen overflow-hidden bg-slate-100 text-slate-900 select-none">
       {/* ── Background Mapbox dengan Mode Terang (streets-v12 + Injected Traffic Flow) ── */}
       <div className="absolute inset-0 z-0">
-        {token ? (
+        {!mounted ? (
+          <div className="flex h-full w-full items-center justify-center bg-slate-950 text-slate-400">
+            <div className="flex flex-col items-center gap-2">
+              <span className="h-6 w-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+              <span className="text-xs font-semibold tracking-wide">Menyiapkan Engine Peta Mapbox...</span>
+            </div>
+          </div>
+        ) : token ? (
           <Map
             initialViewState={{
               latitude: 3.5680,
@@ -247,7 +301,7 @@ export default function HistoryPlaybackPage() {
             mapStyle="mapbox://styles/mapbox/streets-v12"
             mapboxAccessToken={token}
             style={{ width: '100%', height: '100%' }}
-            cursor={mapCursor}
+            cursor={pickingLocationMode ? 'crosshair' : mapCursor}
             interactiveLayerIds={['flooded-segments-line', 'flooded-segments-glow']}
             onClick={handleMapClick}
             onMouseEnter={handleMouseEnter}
@@ -372,6 +426,111 @@ export default function HistoryPlaybackPage() {
                 }}
               />
             </Source>
+
+            {/* ── LAYER RUTE AMAN BEBAS BANJIR (LINE LAYER DENGAN CASING TEBAL & WARNA BIRU TERANG) ── */}
+            {safeRouteResult && safeRouteResult.success && safeRouteResult.geometry && (
+              <Source id="flood-safe-route-source" type="geojson" data={safeRouteResult.geometry}>
+                {/* 1. Casing / Bayangan Luar Kontras Tinggi */}
+                <Layer
+                  id="flood-safe-route-casing"
+                  type="line"
+                  layout={{
+                    'line-join': 'round',
+                    'line-cap': 'round',
+                  }}
+                  paint={{
+                    'line-width': [
+                      'interpolate',
+                      ['linear'],
+                      ['zoom'],
+                      10,
+                      5,
+                      13,
+                      10,
+                      16,
+                      16,
+                    ],
+                    'line-color': '#0f172a',
+                    'line-opacity': 0.85,
+                  }}
+                />
+
+                {/* 2. Garis Inti Rute: Biru Terang / Cyan Elektrik (#0284c7 / #06b6d4) */}
+                <Layer
+                  id="flood-safe-route-line"
+                  type="line"
+                  layout={{
+                    'line-join': 'round',
+                    'line-cap': 'round',
+                  }}
+                  paint={{
+                    'line-width': [
+                      'interpolate',
+                      ['linear'],
+                      ['zoom'],
+                      10,
+                      3.5,
+                      13,
+                      6,
+                      16,
+                      11,
+                    ],
+                    'line-color':
+                      safeRouteResult.classification === 'YELLOW_WARNING'
+                        ? '#0284c7' // Biru Terang Waspada Kuning
+                        : '#06b6d4', // Cyan Terang Prioritas Putih
+                    'line-opacity': 0.98,
+                  }}
+                />
+              </Source>
+            )}
+
+            {/* ── MARKER PIN TITIK ASAL & TUJUAN NAVIGASI ── */}
+            {safeRouteResult && safeRouteResult.success && safeRouteResult.geometry.coordinates.length >= 2 && (
+              <>
+                {/* Marker Asal (Hijau) */}
+                <Marker
+                  longitude={safeRouteResult.geometry.coordinates[0][0]}
+                  latitude={safeRouteResult.geometry.coordinates[0][1]}
+                  anchor="bottom"
+                >
+                  <div className="flex flex-col items-center pointer-events-none drop-shadow-2xl">
+                    <span className="rounded-lg bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white shadow-lg border border-white tracking-wide">
+                      🟢 Titik Asal
+                    </span>
+                    <span className="text-2xl drop-shadow">📍</span>
+                  </div>
+                </Marker>
+
+                {/* Marker Destinasi (Merah) */}
+                <Marker
+                  longitude={safeRouteResult.geometry.coordinates[safeRouteResult.geometry.coordinates.length - 1][0]}
+                  latitude={safeRouteResult.geometry.coordinates[safeRouteResult.geometry.coordinates.length - 1][1]}
+                  anchor="bottom"
+                >
+                  <div className="flex flex-col items-center pointer-events-none drop-shadow-2xl">
+                    <span className="rounded-lg bg-red-600 px-2 py-0.5 text-[10px] font-black text-white shadow-lg border border-white tracking-wide">
+                      🏁 Destinasi
+                    </span>
+                    <span className="text-2xl drop-shadow">📍</span>
+                  </div>
+                </Marker>
+
+                {/* Marker Koridor Bypass jika digunakan */}
+                {safeRouteResult.usedBypassWaypoint && (
+                  <Marker
+                    longitude={safeRouteResult.usedBypassWaypoint.lng}
+                    latitude={safeRouteResult.usedBypassWaypoint.lat}
+                    anchor="center"
+                  >
+                    <div className="flex items-center gap-1.5 rounded-full bg-blue-900/90 border border-blue-400 px-2.5 py-1 text-[9px] font-bold text-blue-200 shadow-2xl backdrop-blur-md">
+                      <span className="h-2 w-2 rounded-full bg-blue-400 animate-ping" />
+                      <span>Bypass: {(safeRouteResult.usedBypassWaypoint.name || 'Jalur Bypass').split('(')[0]}</span>
+                    </div>
+                  </Marker>
+                )}
+              </>
+            )}
 
             {/* ── 3. PIN LOKASI & LABEL DATA DI TENGAH SETIAP SEGMEN JALAN ── */}
             {!isSafeState &&
@@ -564,6 +723,22 @@ export default function HistoryPlaybackPage() {
             <span className="hidden sm:inline">Pusat Analitik</span>
           </Link>
 
+          {/* Tombol Toggle Fitur Navigasi Rute Bebas Banjir */}
+          <button
+            type="button"
+            onClick={() => setShowNavPanel(!showNavPanel)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold shadow-xl backdrop-blur-md transition active:scale-95 cursor-pointer ${
+              showNavPanel
+                ? 'border-blue-400 bg-blue-600 text-white ring-2 ring-blue-500/40 shadow-blue-600/30'
+                : 'border-slate-700/80 bg-slate-900/90 text-slate-200 hover:bg-slate-800 hover:text-white'
+            }`}
+            title="Buka / Tutup Navigasi Rute Aman Bebas Banjir"
+          >
+            <span>🧭</span>
+            <span>Rute Aman</span>
+            {safeRouteResult && <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />}
+          </button>
+
           <div className="flex items-center gap-2.5 rounded-xl border border-slate-700/80 bg-slate-900/90 px-3 py-1.5 text-xs shadow-xl backdrop-blur-md text-white">
             <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-600 text-xs font-black text-white shadow-xs">
               FL
@@ -641,8 +816,30 @@ export default function HistoryPlaybackPage() {
         </div>
       </header>
 
+      {/* ── Floating Left: Navigasi Rute Bebas Banjir (Spatial Constraints) ── */}
+      {showNavPanel && (
+        <div className="absolute left-3 top-16 sm:left-4 sm:top-20 z-30 max-h-[calc(100vh-10rem)] overflow-y-auto">
+          <FloodSafeRouteNavigation
+            floodedSegments={activeSegments}
+            cascadingRoutes={activeCascading}
+            waterFactor={factor}
+            mapboxToken={token || ''}
+            onRouteCalculated={(result) => setSafeRouteResult(result)}
+            onPickingLocationChange={(mode) => setPickingLocationMode(mode)}
+            pickingLocationMode={pickingLocationMode}
+            externalStart={externalStart}
+            externalDest={externalDest}
+            isSafeState={isSafeState}
+          />
+        </div>
+      )}
+
       {/* ── Floating Left: Daftar Ruas Jalan & Legenda 3-Tier Multi-Layer ── */}
-      <div className="pointer-events-auto hidden xl:flex flex-col absolute left-6 top-20 z-20 w-72 max-h-[calc(100vh-14.5rem)] rounded-2xl border border-slate-800/90 bg-slate-900/90 p-4 text-xs backdrop-blur-md shadow-2xl text-white overflow-hidden">
+      <div
+        className={`pointer-events-auto hidden xl:flex flex-col absolute top-20 z-20 w-72 max-h-[calc(100vh-14.5rem)] rounded-2xl border border-slate-800/90 bg-slate-900/90 p-4 text-xs backdrop-blur-md shadow-2xl text-white overflow-hidden transition-all duration-300 ${
+          showNavPanel ? 'left-[26rem]' : 'left-6'
+        }`}
+      >
         <h3 className="font-bold text-white uppercase tracking-wider text-[11px] border-b border-slate-800/80 pb-2 shrink-0 flex items-center justify-between">
           <span>{isSafeState ? 'STATUS MONITORING JALAN' : isNov27 ? 'Ruas Tergenang (27 Nov)' : 'Ruas Tergenang (11 Okt)'}</span>
           <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
