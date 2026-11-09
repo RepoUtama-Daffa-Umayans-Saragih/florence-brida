@@ -1,28 +1,25 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handler = void 0;
+exports.default = default_1;
 const core_1 = require("@nestjs/core");
 const app_module_1 = require("./app.module");
-const serverless_express_1 = __importDefault(require("@vendia/serverless-express"));
-let server;
+let cachedServer;
 async function bootstrap() {
-    const app = await core_1.NestFactory.create(app_module_1.AppModule);
-    app.setGlobalPrefix('api/v1');
-    app.enableCors({
-        origin: '*',
-        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-        credentials: true,
-    });
-    await app.init();
-    const expressApp = app.getHttpAdapter().getInstance();
-    return (0, serverless_express_1.default)({ app: expressApp });
+    if (!cachedServer) {
+        const app = await core_1.NestFactory.create(app_module_1.AppModule);
+        app.setGlobalPrefix('api/v1');
+        app.enableCors({
+            origin: '*',
+            methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+            credentials: true,
+        });
+        await app.init();
+        cachedServer = app.getHttpAdapter().getInstance();
+    }
+    return cachedServer;
 }
-const handler = async (event, context, callback) => {
-    server = server ?? (await bootstrap());
-    return server(event, context, callback);
-};
-exports.handler = handler;
+async function default_1(req, res) {
+    const server = await bootstrap();
+    return server(req, res);
+}
 //# sourceMappingURL=serverless.js.map
